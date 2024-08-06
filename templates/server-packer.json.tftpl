@@ -1,0 +1,53 @@
+{
+  "builders": [
+    {
+      "name": "builder",
+      "type": "yandex",
+      "endpoint": "api.cloud.yandex.net:443",
+      "service_account_id": "${service_acc_id}",
+      "service_account_key_file": "generated_files/key.json",
+      "folder_id": "${folder_id}",
+      "zone": "ru-central1-a",
+      "subnet_id": "${subnet_id}",
+      "state_timeout": "40m",
+      "use_ipv4_nat": true,
+      "use_ipv6": false,
+      "platform_id": "standard-v3",
+      "image_name": "${packer_image_name}",
+      "image_family": "queue-autoscale-image-demo",
+      "image_description": "Image for autoscaling an instance group based on the size of a queue",
+      "source_image_family": "${packer_source_image_family}",
+      "disk_type": "network-hdd",
+      "disk_size_gb": 10,
+      "ssh_username": "ubuntu"
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "file",
+      "sources": [
+        "files/server.py",
+        "generated_files/queue"
+      ],
+      "destination": "/tmp/"
+    },
+    {
+      "type": "shell",
+      "inline": [
+        "sudo mv /tmp/server.py /etc/server.py",
+        "sudo mv /tmp/queue /etc/queue"
+      ]
+    },
+    {
+      "type": "shell",
+      "inline": [
+        "pwd",
+        "sudo apt-get update",
+        "sudo apt-get install python3-pip jq -y",
+        "sudo pip3 install --target=/usr/lib/python3/dist-packages pyyaml",
+        "sudo pip3 install --target=/usr/lib/python3/dist-packages boto3==1.28.78",
+        "sudo pip3 install --upgrade --target=/usr/lib/python3/dist-packages botocore==1.31.78"
+      ]
+    }
+  ]
+}

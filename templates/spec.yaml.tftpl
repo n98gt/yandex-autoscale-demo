@@ -1,0 +1,66 @@
+folder_id: ${folder_id}
+name: ${instance_group_name}
+instance_template:
+  platform_id: standard-v2
+  resources_spec:
+    memory: "1073741824"
+    # memory: "2147483648"
+    cores: "2"
+    core_fraction: "50"
+  metadata:
+    serial-port-enable: "1"
+    enable-oslogin: "true"
+    user-data: |
+      #cloud-config
+      ---
+      write_files:
+        - content: |
+            ${indent(12, launch_script_content)}
+
+          path: /var/lib/cloud/scripts/per-boot/launch.sh
+          permissions: "0755"
+
+  boot_disk_spec:
+    mode: READ_WRITE
+    disk_spec:
+      type_id: network-hdd
+      size: "10737418240"
+      image_id: ${image_id}
+  network_interface_specs:
+    - network_id: ${network_id}
+      subnet_ids:
+        - ${subnet_id}
+      # primary_v4_address_spec: {}
+      primary_v4_address_spec:
+        one_to_one_nat_spec:
+          ip_version: IPV4
+  # scheduling_policy: {}
+  scheduling_policy:
+    preemptible: true
+  service_account_id: ${vm_service_acc_id}
+scale_policy:
+  auto_scale:
+    min_zone_size: "0"
+    max_size: "5"
+    measurement_duration: 60s
+    warmup_duration: 0s
+    stabilization_duration: 180s
+    initial_size: "1"
+    auto_scale_type: REGIONAL
+    custom_rules:
+      - rule_type: WORKLOAD
+        metric_type: GAUGE
+        metric_name: queue.messages.stored_count
+        labels:
+          queue: queue-autoscale-queue
+        target: 5
+        service: message-queue
+deploy_policy:
+  max_unavailable: "2"
+  max_expansion: "2"
+  startup_duration: 0s
+  strategy: OPPORTUNISTIC
+allocation_policy:
+  zones:
+    - zone_id: ru-central1-a
+service_account_id: ${service_acc_id}

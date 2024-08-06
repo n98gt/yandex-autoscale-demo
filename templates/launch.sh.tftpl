@@ -1,0 +1,43 @@
+#!/usr/bin/env sh
+
+readonly script_name="$${0##*/}"
+echo "===> $${script_name}: START"
+
+export LOCKBOX_API_DOMAIN=payload.lockbox.api.cloud.yandex.net
+export LOCKBOX_API_URL="https://$${LOCKBOX_API_DOMAIN}/lockbox/v1/secrets"
+export ACCESS_KEYS_FILE_LOCATION=/etc/access_key
+export ACCESS_KEYS_SECRET_ID=${secret_id}
+
+echo "===> $${script_name}: creating files for secrets …"
+touch $${ACCESS_KEYS_FILE_LOCATION}
+
+chmod 400 $${ACCESS_KEYS_FILE_LOCATION}
+
+IAM_TOKEN=$(curl -H Metadata-Flavor:Google http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token | jq -r .access_token)
+
+
+until ping -c1 "$${LOCKBOX_API_DOMAIN}" >/dev/null 2>&1; do
+    echo "Waiting for $${LOCKBOX_API_DOMAIN} to be reachable..."
+    sleep 5
+done
+
+echo "===> $${script_name}: retrieving access key secrets from lockbox …"
+ACCESS_KEYS_SECRETS_PAYLOAD=$(curl -s -X GET -H "Authorization: Bearer $${IAM_TOKEN}" "$${LOCKBOX_API_URL}/$${ACCESS_KEYS_SECRET_ID}/payload")
+echo "===> $${script_name}: lockbox curl exit status: $?"
+ACCESS_KEY=$(echo "$${ACCESS_KEYS_SECRETS_PAYLOAD}" | jq -r '.entries[] | select(.key == "access_key") | .textValue')
+SECRET_KEY=$(echo "$${ACCESS_KEYS_SECRETS_PAYLOAD}" | jq -r '.entries[] | select(.key == "secret_key") | .textValue')
+
+echo "===> $${script_name}: saving secrets to file …"
+cat <<EOF > /etc/access_key
+access_key:
+  key_id: $${ACCESS_KEY}
+secret: $${SECRET_KEY}
+EOF
+
+echo "===> $${script_name}: changing secrets file permissions …"
+chmod 400 /etc/access_key
+
+echo "===> $${script_name}: launching server.py …"
+python3 /etc/server.py &
+
+echo "===> $${script_name}: END"
